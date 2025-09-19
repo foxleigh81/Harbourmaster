@@ -226,10 +226,11 @@ program
       }
     }
 
-    if (password.length < 8) {
-      console.error('❌ Password must be at least 8 characters long');
-      process.exit(1);
-    }
+    // Allow any password length for development
+    // if (password.length < 8) {
+    //   console.error('❌ Password must be at least 8 characters long');
+    //   process.exit(1);
+    // }
 
     try {
       const authService = AuthService.getInstance();

@@ -39,7 +39,7 @@ export class AuthService {
       logger.info('Loaded existing auth configuration');
     } catch {
       // First run - create new config
-      const password = process.env.HARBOURMASTER_PASSWORD || this.generatePassword();
+      const password = process.env.HARBOURMASTER_PASSWORD || 'admin';
 
       this.config = {
         passwordHash: await bcrypt.hash(password, 12),
@@ -55,7 +55,9 @@ export class AuthService {
       console.log('🔐 Harbourmaster First Run Setup');
       console.log('═'.repeat(60));
       console.log('Admin password:', password);
-      console.log('Save this password! It cannot be recovered.');
+      if (password === 'admin') {
+        console.log('⚠️  Using default password. Please change it!');
+      }
       console.log('To change it later, run: harbourmasterd set-admin');
       console.log('Access UI at: http://localhost:9190');
       console.log('═'.repeat(60));

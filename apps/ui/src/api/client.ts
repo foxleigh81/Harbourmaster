@@ -1,9 +1,8 @@
-import type { 
-  ApiResponse, 
-  Container, 
-  AuthResponse, 
-  HealthResponse,
-  ErrorCode 
+import type {
+  ApiResponse,
+  Container,
+  AuthResponse,
+  HealthResponse
 } from '@harbourmaster/shared';
 
 class ApiClient {
@@ -15,7 +14,7 @@ class ApiClient {
     path: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...options.headers,
     };

@@ -43,3 +43,5 @@ pids/
 # Harbourmaster specific
 .harbourmaster/
 *.auth.json
+*storybook.log
+storybook-static

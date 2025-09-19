@@ -93,12 +93,11 @@ async function start() {
 
     await server.register(fastifyStatic, {
       root: uiPath,
-      prefix: '/',
-      wildcard: false
+      prefix: '/'
     });
 
     // Serve index.html for client-side routing
-    server.setNotFoundHandler((request, reply) => {
+    server.setNotFoundHandler(async (request, reply) => {
       if (request.url.startsWith('/api')) {
         reply.code(404).send({
           success: false,
@@ -107,7 +106,15 @@ async function start() {
           timestamp: Date.now()
         });
       } else {
-        reply.sendFile('index.html');
+        // Check if the requested file exists as a static asset
+        const requestPath = request.url.split('?')[0];
+        if (requestPath.includes('.') && !requestPath.endsWith('.html')) {
+          // This looks like a static asset that wasn't found
+          reply.code(404).send('Not found');
+        } else {
+          // This is likely a client-side route, serve index.html
+          reply.sendFile('index.html');
+        }
       }
     });
   } catch (error) {

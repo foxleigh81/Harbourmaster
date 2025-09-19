@@ -47,10 +47,11 @@ async function start() {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"], // Required for Tailwind
-        scriptSrc: ["'self'", "'strict-dynamic'"],
+        scriptSrc: ["'self'"], // Allow scripts from same origin
+        scriptSrcAttr: ["'unsafe-inline'"], // Required for React
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameSrc: ["'none'"],

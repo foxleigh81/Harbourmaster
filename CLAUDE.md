@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Harbourmaster OS is a Debian-based, self-hosted operating system that provides a friendly Unraid-like UI for Docker container management without a paid license. The system ships with Docker Engine, a Node.js manager daemon that talks to the local Docker socket, and a React UI.
+Harbourmaster is a Node.js application that provides a friendly Unraid-like web UI for Docker container management without a paid license. It features a secure daemon (harbourmasterd) that talks to the local Docker socket and a React UI for container management.
 
 ### Core Features
 - First-class, safe container management via a clean web UI
@@ -22,21 +22,20 @@ Harbourmaster OS is a Debian-based, self-hosted operating system that provides a
 ## Development Commands
 
 ```bash
-# API Server (Node.js)
-cd apps/api
-npm install
-npm run dev       # Development server with hot reload
-npm run build     # Production build
-npm run lint      # Run ESLint
-npm run test      # Run tests
+# Install dependencies (from root)
+pnpm install
 
-# UI (React)
+# Daemon development
+cd apps/daemon
+pnpm dev       # Development server with hot reload
+pnpm build     # Production build
+pnpm test      # Run tests
+
+# UI development
 cd apps/ui
-npm install
-npm run dev       # Development server (Vite)
-npm run build     # Production build
-npm run lint      # Run ESLint
-npm run preview   # Preview production build
+pnpm dev       # Development server (Vite)
+pnpm build     # Production build
+pnpm preview   # Preview production build
 
 # Docker operations (for testing)
 docker ps -a                    # List all containers
@@ -47,23 +46,20 @@ docker stats                    # Monitor container resources
 ## Architecture
 
 ### System Architecture
-- **Base OS**: Debian minimal base
-- **Container Runtime**: Docker Engine (rootless or standard)
-- **Manager Service**: Node.js daemon connecting to `/var/run/docker.sock`
-- **Reverse Proxy**: Caddy or Traefik for TLS and auth
-- **Frontend**: React UI (speaks only to Manager API, never to Docker directly)
+- **Daemon**: Node.js service (harbourmasterd) connecting to `/var/run/docker.sock`
+- **API**: RESTful HTTP/HTTPS API (configurable)
+- **Frontend**: React UI (speaks only to daemon API, never to Docker directly)
 - **Store Service**: Optional - static Git-backed manifests initially
 
 ### Process Model
-- `docker.service` - systemd unit for Docker
-- `docker-manager.service` - Node daemon
-- `caddy.service` or `traefik.service` - TLS termination
-- `docker-manager-store.service` - Optional private store
+- `harbourmasterd` - Node.js daemon (can run standalone, with PM2, or as systemd service)
+- Optional reverse proxy (Caddy/Traefik/nginx) for TLS termination
+- Optional store service for app manifests
 
 ### Security Model
-- Manager is the only process allowed to access Docker socket
-- Manager runs as non-root service account
-- HTTPS with strong defaults (HTTP disabled unless explicitly toggled)
+- Daemon is the only process allowed to access Docker socket
+- Daemon runs with minimal privileges (requires docker group membership)
+- HTTPS with strong defaults (HTTP allowed for local development)
 - Session cookies with SameSite=strict and CSRF protection
 - Audit log of management actions in JSON Lines format
 - Encrypted credential storage using libsodium
@@ -82,13 +78,15 @@ docker stats                    # Monitor container resources
 ```
 harbourmaster/
   apps/
-    api/                 # Node.js backend
+    daemon/                 # Node.js backend
       src/
         routes/          # API route handlers
         services/        # Business logic
         lib/
           docker/        # Docker API wrapper using dockerode
           security/      # Auth, encryption, validation
+      bin/
+        cli.ts          # CLI entry point
       package.json
     ui/                  # React frontend
       src/
@@ -97,14 +95,12 @@ harbourmaster/
         hooks/          # Custom React hooks
         api/            # API client
       package.json
-  packaging/
-    deb/                # Debian package files
-    iso/                # ISO build scripts
-    images/             # VM images (qcow2, ova)
+  packages/              # Shared packages
+    shared/              # Types, validators, utils
   docs/
-    adr/                # Architecture Decision Records
-  Caddyfile             # Reverse proxy config
-  .env.example          # Environment variables template
+    adrs/                # Architecture Decision Records
+  package.json           # Workspace root
+  pnpm-workspace.yaml    # pnpm workspace config
 ```
 
 ## Key Conventions
@@ -113,7 +109,7 @@ harbourmaster/
 - **File naming**: Use kebab-case for all files and folders
 - **Container naming**: Default to app slug with numeric suffix when needed
 - **Volume naming**: Use `app-slug_data` pattern
-- **TypeScript**: Prefer TypeScript for both API and UI
+- **TypeScript**: Prefer TypeScript for both daemon and UI
 - **No comments**: Do not add comments unless specifically requested
 - **Error handling**: Always validate inputs and provide friendly error messages
 
@@ -177,21 +173,21 @@ GET    /api/store/manifests/:slug
 
 ```bash
 # Unit tests
-npm run test
+pnpm test
 
 # Integration tests (requires Docker)
-npm run test:integration
+pnpm test:integration
 
 # E2E tests (requires full stack running)
-npm run test:e2e
+pnpm test:e2e
 ```
 
 ## Development Workflow
 
 1. **Local Development**
-   - Start Docker daemon
-   - Run API server in dev mode
-   - Run UI dev server
+   - Ensure Docker daemon is running
+   - Run daemon in dev mode: `cd apps/daemon && pnpm dev`
+   - Run UI dev server: `cd apps/ui && pnpm dev`
    - Access UI at http://localhost:5173
 
 2. **Testing Changes**
@@ -200,15 +196,15 @@ npm run test:e2e
    - Check error handling for edge cases
 
 3. **Before Committing**
-   - Run linters: `npm run lint`
-   - Run tests: `npm run test`
+   - Run linters: `pnpm lint`
+   - Run tests: `pnpm test`
    - Verify no secrets in code
 
 ## Important Implementation Notes
 
 ### Docker Socket Access
 - NEVER expose docker.sock to the browser
-- All Docker operations go through the Manager API
+- All Docker operations go through the daemon API
 - Use dockerode library for all Docker interactions
 
 ### Update Strategy
@@ -248,6 +244,35 @@ npm run test:e2e
 - Signed manifests with publisher keys
 - Trust verification on client
 
+## Configuration
+
+Harbourmaster can be configured via environment variables or config file:
+
+```bash
+# Environment variables
+PORT=3000
+HOST=0.0.0.0
+DOCKER_SOCKET=/var/run/docker.sock
+DATA_DIR=~/.harbourmaster/data
+LOG_LEVEL=info
+ENABLE_TLS=false
+```
+
+Or via `~/.harbourmaster/config.json`:
+
+```json
+{
+  "port": 3000,
+  "host": "0.0.0.0",
+  "dockerSocket": "/var/run/docker.sock",
+  "dataDir": "~/.harbourmaster/data",
+  "logLevel": "info",
+  "tls": {
+    "enabled": false
+  }
+}
+```
+
 ## Debugging Tips
 
 ```bash
@@ -257,9 +282,12 @@ ls -la /var/run/docker.sock
 # Test Docker connection
 curl --unix-socket /var/run/docker.sock http://localhost/version
 
-# View manager service logs
-journalctl -u docker-manager -f
+# View daemon logs (if using systemd)
+journalctl -u harbourmasterd -f
 
 # Check container events
 docker events --format '{{json .}}'
+
+# Test daemon API
+curl http://localhost:3000/api/health
 ```

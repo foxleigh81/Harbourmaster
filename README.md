@@ -1,8 +1,8 @@
-# Harbourmaster OS
+# Harbourmaster
 
 ## Summary
 
-Goal: build a Debian-based, self-hosted OS that provides a friendly Unraid-like UI for Docker container management without a paid licence. The system ships with Docker Engine, a Node.js manager daemon that talks to the local Docker socket, and a React UI. Optional app store enables curated, form-driven installs of popular containers. Future work explores a peer-to-peer store to avoid central hosting costs.
+Harbourmaster is a Node.js application that provides a friendly Unraid-like web UI for Docker container management. It features a secure daemon that talks to the local Docker socket and a React UI for container management. Optional app store enables curated, form-driven installs of popular containers. Future work explores a peer-to-peer store to avoid central hosting costs.
 
 ## Objectives
 
@@ -11,7 +11,7 @@ Goal: build a Debian-based, self-hosted OS that provides a friendly Unraid-like 
 - Friendly creation wizard for images, ports, volumes, env, healthchecks, restart policy.
 - Visual status, logs, metrics, exec and update checks by digest.
 - Human-editable app manifests and a store that can be centralised initially and decentralised later.
-- Install paths that feel like an OS but are just Debian plus packages and sane defaults.
+- Easy installation via npm/pnpm or Docker itself.
 
 ## Non-goals
 
@@ -21,25 +21,22 @@ Goal: build a Debian-based, self-hosted OS that provides a friendly Unraid-like 
 
 ## High-level architecture
 
-- Debian minimal base
-- Docker Engine (rootless or standard)
-- Node.js Manager Service
-    - Connects to `/var/run/docker.sock`
-    - Exposes HTTPS API to the UI only on localhost by default
-- Reverse proxy for TLS and auth
-    - Caddy or Traefik
+- Node.js Daemon (harbourmasterd)
+    - Connects to `/var/run/docker.sock`
+    - Exposes HTTP/HTTPS API (configurable)
+    - Handles all Docker operations securely
 - React UI
-    - Speaks to Manager API. Never talks to Docker directly.
+    - Modern web interface for container management
+    - Speaks only to daemon API, never to Docker directly
 - Optional Store service
     - Starts as static Git-backed manifests and an index.json
     - Later P2P distribution with signed manifests
 
 ### Process model
 
-- `docker.service` systemd unit
-- `docker-manager.service` Node daemon
-- `caddy.service` or `traefik.service` for TLS
-- Optional `docker-manager-store.service` if hosting a private store
+- `harbourmasterd` - Node.js daemon (can run as systemd service, PM2, or standalone)
+- Optional reverse proxy (Caddy/Traefik/nginx) for TLS termination
+- Optional store service for app manifests
 
 ## Security model
 
@@ -70,34 +67,46 @@ Goal: build a Debian-based, self-hosted OS that provides a friendly Unraid-like 
 
 ## Installation options
 
-### Option A. Debian installer plus packages
+### Option A. npm/pnpm install (recommended)
 
-- Provide an apt repository with these packages:
-    - `docker-manager` Node daemon
-    - `docker-manager-ui` static assets
-    - `docker-manager-firstboot` wizard
-    - Dependencies: Docker Engine, Caddy or Traefik
-- Users install Debian, add repo, then `apt install docker-manager`.
-- Lowest maintenance and easiest upgrades.
+```bash
+# Global install
+npm install -g harbourmaster
 
-### Option B. Branded live ISO
+# Or with pnpm
+pnpm add -g harbourmaster
 
-- Use `live-build` to create an ISO that boots into the installer with the packages preselected.
-- Gives the feel of a dedicated OS while still being Debian underneath.
+# Run the daemon
+harbourmasterd
+```
 
-### Option C. Cloud images
+### Option B. Docker container
 
-- Pre-baked `qcow2` and `ova` images for Proxmox, ESXi and VirtualBox.
-- Ideal for homelab users spinning up VMs quickly.
+```bash
+docker run -d \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -p 3000:3000 \
+  harbourmaster/harbourmaster
+```
 
-## First boot flow
+### Option C. From source
 
-1. Detect GPU, CPU flags and available disks.
-2. Ask for hostname, timezone and admin password.
-3. Offer to set up Tailscale or WireGuard for remote admin.
-4. Choose app data root, default `/srv/appdata`.
-5. Generate TLS via local CA or ACME if DNS is routable.
-6. Create admin user and log in to UI.
+```bash
+git clone https://github.com/yourusername/harbourmaster
+cd harbourmaster
+pnpm install
+pnpm build
+pnpm start
+```
+
+## First run setup
+
+1. Start the daemon with `harbourmasterd`
+2. Navigate to http://localhost:3000 (or configured port)
+3. Set admin password on first access
+4. Configure app data root directory (default: `~/.harbourmaster/data`)
+5. Optional: Configure TLS certificates
+6. Start managing containers
 
 ## Phase plan
 
@@ -113,18 +122,18 @@ Goal: build a Debian-based, self-hosted OS that provides a friendly Unraid-like 
 **API surface**
 
 - `GET /api/containers?all=true`
-- `POST /api/containers` create
+- `POST /api/containers` create
 - `POST /api/containers/:id/start`
 - `POST /api/containers/:id/stop`
 - `POST /api/containers/:id/restart`
 - `DELETE /api/containers/:id`
 - `GET /api/containers/:id/logs?since=...&follow=true`
-- WebSocket `ws://.../api/containers/:id/exec` for interactive shells
+- WebSocket `ws://.../api/containers/:id/exec` for interactive shells
 - `GET /api/images`
 - `POST /api/images/pull`
-- `GET /api/events` server-sent events to reflect Docker events
-- `GET /api/stats` per-container CPU, RAM, Net I O
-- `POST /api/templates` to save a running container as a template
+- `GET /api/events` server-sent events to reflect Docker events
+- `GET /api/stats` per-container CPU, RAM, Net I O
+- `POST /api/templates` to save a running container as a template
 
 **dockerode usage examples**
 
@@ -157,21 +166,21 @@ const ws = await exec.start({ hijack: true, Tty: true });// bridge to browser We
 
 ```
 
-**Systemd units**
+**Running as a systemd service (optional)**
 
-`/etc/systemd/system/docker-manager.service`
+`/etc/systemd/system/harbourmasterd.service`
 
 ```
 [Unit]
-Description=Docker Manager
+Description=Harbourmaster Daemon
 After=docker.service
 Requires=docker.service
 
 [Service]
-User=manager
-Group=manager
+User=harbourmaster
+Group=docker
 Environment=NODE_ENV=production
-ExecStart=/usr/local/bin/docker-manager
+ExecStart=/usr/local/bin/harbourmasterd
 Restart=on-failure
 
 [Install]
@@ -247,7 +256,7 @@ notes:
 
 **Index service**
 
-- Build an `index.json` with app slugs, latest tags, and digests.
+- Build an `index.json` with app slugs, latest tags, and digests.
 - Sign the index with a store key. Clients verify before trusting.
 - Store hosted as static content on GitHub Pages or any CDN.
 - Submissions via PR keep curation and cost near zero.
@@ -256,7 +265,7 @@ notes:
 
 - Use distribution APIs to list tags and fetch digests.
 - Cache in CI and update the index on a schedule.
-- Manager compares deployed `image@sha256:...` against the index to show update badges.
+- Manager compares deployed `image@sha256:...` against the index to show update badges.
 
 ### Phase 3 Decentralised store
 
@@ -311,27 +320,33 @@ Targets later. Options to evaluate:
 Use kebab-case for files and folders.
 
 ```
-docker-manager/
+harbourmaster/
   apps/
-    api/
+    daemon/
       src/
         routes/
         services/
-        lib/docker/
-        lib/security/
+        lib/
+          docker/
+          security/
+      bin/
+        cli.ts
       package.json
     ui/
       src/
+        components/
+        pages/
+        hooks/
+        api/
       package.json
-  packaging/
-    deb/
-    iso/
-    images/
+  packages/
+    shared/
+      types/
+      utils/
   docs/
-    adr/
-      0001-architecture.md
-  Caddyfile
-  .env.example
+    adrs/
+  package.json
+  pnpm-workspace.yaml
 
 ```
 
@@ -352,40 +367,47 @@ docker-manager/
 
 ## Roadmap checklist
 
-- [ ]  Package repo and installer scripts
-- [ ]  Manager API core endpoints
+- [ ]  Core daemon with Docker API integration
+- [ ]  REST API endpoints for container management
 - [ ]  Event and stats streaming
-- [ ]  Create wizard with validation and presets
-- [ ]  TLS and auth
-- [ ]  Templates and export-import
+- [ ]  React UI with container management features
+- [ ]  Authentication and session management
+- [ ]  Container templates and export/import
 - [ ]  Update detection by digest
-- [ ]  Store schema v1 and static index
-- [ ]  Install from store flow
+- [ ]  App store with manifest schema v1
+- [ ]  CLI for daemon management
 - [ ]  Documentation and ADRs
 
-## Appendix A. Example systemd units
+## Appendix A. Configuration
 
-`/etc/systemd/system/docker-manager.service`
+Harbourmaster can be configured via environment variables or a config file:
 
-```
-[Unit]
-Description=Docker Manager
-After=docker.service
-Requires=docker.service
-
-[Service]
-User=manager
-Group=manager
-Environment=NODE_ENV=production
-ExecStart=/usr/local/bin/docker-manager
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-
+```bash
+# Environment variables
+PORT=3000
+HOST=0.0.0.0
+DOCKER_SOCKET=/var/run/docker.sock
+DATA_DIR=~/.harbourmaster/data
+LOG_LEVEL=info
+ENABLE_TLS=false
 ```
 
-## Appendix B. Example Caddyfile
+Or via `~/.harbourmaster/config.json`:
+
+```json
+{
+  "port": 3000,
+  "host": "0.0.0.0",
+  "dockerSocket": "/var/run/docker.sock",
+  "dataDir": "~/.harbourmaster/data",
+  "logLevel": "info",
+  "tls": {
+    "enabled": false
+  }
+}
+```
+
+## Appendix B. Caddyfile
 
 ```
 :443 {
@@ -396,7 +418,7 @@ WantedBy=multi-user.target
 
 ```
 
-## Appendix C. API sketch
+## Appendix B. API endpoints
 
 ```
 GET    /api/health
@@ -426,7 +448,7 @@ GET    /api/store/manifests/:slug
 
 ```
 
-## Appendix D. Example manifest schema JSON Schema
+## Appendix C. Example manifest schema JSON Schema
 
 ```json
 {
@@ -496,8 +518,8 @@ GET    /api/store/manifests/:slug
 
 ```
 
-## Appendix E. Naming conventions
+## Appendix D. Naming conventions
 
 - Filenames and slugs use kebab-case.
 - Container names default to the app slug with a numeric suffix when needed.
-- Named volumes use `app-slug_data` pattern by default.
+- Named volumes use `app-slug_data` pattern by default.

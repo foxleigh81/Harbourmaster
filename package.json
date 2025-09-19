@@ -1,9 +1,17 @@
 {
-  "name": "harbourmaster",
-  "version": "0.0.1",
+  "name": "harbourmaster-monorepo",
+  "version": "0.1.0",
   "private": true,
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "dev:daemon": "pnpm --filter @foxleigh81/harbourmaster dev",
+    "dev:ui": "pnpm --filter @harbourmaster/ui dev",
+    "build": "pnpm -r build",
+    "doctor": "cd apps/daemon && node bin/cli.js doctor",
+    "start": "cd apps/daemon && node bin/cli.js"
+  },
+  "packageManager": "pnpm@8.15.0"
 }

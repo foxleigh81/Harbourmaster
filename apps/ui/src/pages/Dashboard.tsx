@@ -48,7 +48,7 @@ export function Dashboard() {
 
         <ContainerList
           containers={containers}
-          isLoading={isLoading}
+          loading={isLoading}
           onStart={startContainer}
           onStop={stopContainer}
           onRestart={restartContainer}

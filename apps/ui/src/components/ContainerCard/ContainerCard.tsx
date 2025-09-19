@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { Button } from '../Button';
 import { StatusBadge } from '../StatusBadge';
 
@@ -18,10 +18,10 @@ interface Container {
 
 interface ContainerCardProps {
   container: Container;
-  onStart: (id: string) => Promise<void>;
-  onStop: (id: string) => Promise<void>;
-  onRestart: (id: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onStart: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onStop: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onRestart: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onDelete: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const mapStateToStatus = (state: string) => {
@@ -41,7 +41,7 @@ const mapStateToStatus = (state: string) => {
   }
 };
 
-export const ContainerCard = ({
+export const ContainerCard = memo(({
   container,
   onStart,
   onStop,
@@ -50,14 +50,29 @@ export const ContainerCard = ({
 }: ContainerCardProps) => {
   const [isActing, setIsActing] = useState(false);
 
-  const handleAction = async (action: () => Promise<void>) => {
+  const handleAction = useCallback(async (action: () => Promise<{ success: boolean; error?: string }>) => {
     setIsActing(true);
     try {
-      await action();
+      const result = await action();
+      if (!result.success && result.error) {
+        alert(`Operation failed: ${result.error}`);
+      }
+    } catch (error) {
+      alert(`Operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsActing(false);
     }
-  };
+  }, []);
+
+  const handleStart = useCallback(() => handleAction(() => onStart(container.id)), [container.id, onStart, handleAction]);
+  const handleStop = useCallback(() => handleAction(() => onStop(container.id)), [container.id, onStop, handleAction]);
+  const handleRestart = useCallback(() => handleAction(() => onRestart(container.id)), [container.id, onRestart, handleAction]);
+  const handleDelete = useCallback(() => {
+    const containerName = container.names[0]?.replace(/^\//, '') || container.id.slice(0, 12);
+    if (confirm(`Delete container ${containerName}?`)) {
+      handleAction(() => onDelete(container.id));
+    }
+  }, [container.id, container.names, onDelete, handleAction]);
 
   const containerName = container.names[0]?.replace(/^\//, '') || container.id.slice(0, 12);
 
@@ -101,7 +116,7 @@ export const ContainerCard = ({
       <div className="mt-4 flex gap-2">
         {container.state === 'exited' ? (
           <Button
-            onClick={() => handleAction(() => onStart(container.id))}
+            onClick={handleStart}
             disabled={isActing}
             variant="primary"
             size="sm"
@@ -112,7 +127,7 @@ export const ContainerCard = ({
         ) : container.state === 'running' ? (
           <>
             <Button
-              onClick={() => handleAction(() => onStop(container.id))}
+              onClick={handleStop}
               disabled={isActing}
               variant="danger"
               size="sm"
@@ -121,7 +136,7 @@ export const ContainerCard = ({
               Stop
             </Button>
             <Button
-              onClick={() => handleAction(() => onRestart(container.id))}
+              onClick={handleRestart}
               disabled={isActing}
               variant="primary"
               size="sm"
@@ -134,11 +149,7 @@ export const ContainerCard = ({
 
         {container.state === 'exited' && (
           <Button
-            onClick={() => {
-              if (confirm(`Delete container ${containerName}?`)) {
-                handleAction(() => onDelete(container.id));
-              }
-            }}
+            onClick={handleDelete}
             disabled={isActing}
             variant="secondary"
             size="sm"
@@ -149,4 +160,4 @@ export const ContainerCard = ({
       </div>
     </div>
   );
-};
+});

@@ -45,24 +45,33 @@ export const Header = ({ onLogout, showLogout = true }: HeaderProps) => {
               >
                 Containers
               </a>
-              <a
-                href="/images"
-                className="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium transition-colors"
+              <span
+                className="text-neutral-400 px-3 py-2 text-sm font-medium cursor-not-allowed relative group"
+                title="Coming soon"
               >
                 Images
-              </a>
-              <a
-                href="/volumes"
-                className="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium transition-colors"
+                <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-neutral-800 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  Coming soon
+                </span>
+              </span>
+              <span
+                className="text-neutral-400 px-3 py-2 text-sm font-medium cursor-not-allowed relative group"
+                title="Coming soon"
               >
                 Volumes
-              </a>
-              <a
-                href="/networks"
-                className="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium transition-colors"
+                <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-neutral-800 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  Coming soon
+                </span>
+              </span>
+              <span
+                className="text-neutral-400 px-3 py-2 text-sm font-medium cursor-not-allowed relative group"
+                title="Coming soon"
               >
                 Networks
-              </a>
+                <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs text-white bg-neutral-800 rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  Coming soon
+                </span>
+              </span>
             </nav>
 
             {/* System Status Indicator */}

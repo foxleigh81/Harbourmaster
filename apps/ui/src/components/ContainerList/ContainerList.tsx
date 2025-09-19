@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { ContainerCard } from '../ContainerCard';
 
 interface Container {
@@ -17,10 +18,10 @@ interface Container {
 interface ContainerListProps {
   containers: Container[];
   loading?: boolean;
-  onStart: (id: string) => Promise<void>;
-  onStop: (id: string) => Promise<void>;
-  onRestart: (id: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onStart: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onStop: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onRestart: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onDelete: (id: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const LoadingSkeleton = () => (
@@ -65,7 +66,7 @@ const EmptyState = () => (
   </div>
 );
 
-export const ContainerList = ({
+export const ContainerList = memo(({
   containers,
   loading = false,
   onStart,
@@ -73,6 +74,12 @@ export const ContainerList = ({
   onRestart,
   onDelete,
 }: ContainerListProps) => {
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleStart = useCallback(onStart, []);
+  const handleStop = useCallback(onStop, []);
+  const handleRestart = useCallback(onRestart, []);
+  const handleDelete = useCallback(onDelete, []);
+
   if (loading) {
     return <LoadingSkeleton />;
   }
@@ -87,12 +94,12 @@ export const ContainerList = ({
         <ContainerCard
           key={container.id}
           container={container}
-          onStart={onStart}
-          onStop={onStop}
-          onRestart={onRestart}
-          onDelete={onDelete}
+          onStart={handleStart}
+          onStop={handleStop}
+          onRestart={handleRestart}
+          onDelete={handleDelete}
         />
       ))}
     </div>
   );
-};
+});

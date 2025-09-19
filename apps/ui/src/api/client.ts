@@ -15,9 +15,13 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
+
+    // Only set Content-Type for requests with a body
+    if (options.body) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
@@ -112,10 +116,10 @@ class ApiClient {
     });
   }
 
-  async getContainerLogs(
+  getContainerLogs(
     id: string,
     options: { since?: number; follow?: boolean; tail?: number } = {}
-  ): Promise<EventSource> {
+  ): EventSource {
     const params = new URLSearchParams();
     if (options.since) params.append('since', options.since.toString());
     if (options.follow) params.append('follow', 'true');
